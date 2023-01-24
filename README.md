@@ -20,7 +20,7 @@ The PyTorch implementation of ViSiL can be found [here](https://github.com/MKLab
 
 * Clone this repo:
 ```bash
-git clone https://github.com/MKLab-ITI/visil
+git clone https://github.com/nirbenda/visil-tf2
 cd visil
 ```
 * You can install all the dependencies by

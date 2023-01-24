@@ -12,7 +12,7 @@ The PyTorch implementation of ViSiL can be found [here](https://github.com/MKLab
 
 ## Prerequisites
 * Python 3
-* Tensorflow 1.xx (tested with 1.8-1.15)
+* Tensorflow 2.xx 
 
 ## Getting started
 

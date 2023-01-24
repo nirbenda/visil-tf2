@@ -1,8 +1,10 @@
 import numpy as np
 import tensorflow as tf
-
 from .layers import PCA_layer, Attention_layer, Video_Comparator
 from .similarity import chamfer_similarity, symmetric_chamfer_similarity
+
+tf.compat.v1.disable_eager_execution()
+import tf_slim as slim
 
 
 class ViSiL(object):
@@ -44,7 +46,7 @@ class ViSiL(object):
             raise Exception('[ERROR] Not implemented similarity function: {}. '
                             'Supported options: chamfer or symmetric_chamfer'.format(similarity_function))
 
-        self.frames = tf.placeholder(tf.uint8, shape=(None, None, None, 3), name='input')
+        self.frames = tf.compat.v1.placeholder(tf.uint8, shape=(None, None, None, 3), name='input')
         with tf.device('/cpu:0'):
             if self.net == 'resnet':
                 processed_frames = self.preprocess_resnet(self.frames)
@@ -57,7 +59,7 @@ class ViSiL(object):
                 print('[INFO] Queries will be loaded to the gpu')
                 self.queries = [tf.Variable(np.zeros((1, 9, 3840)), dtype=tf.float32,
                                             validate_shape=False) for _ in range(queries_number)]
-                self.target = tf.placeholder(tf.float32, [None, None, None], name='target')
+                self.target = tf.compat.v1.placeholder(tf.float32, [None, None, None], name='target')
                 self.similarities = []
                 for q in self.queries:
                     sim_matrix = self.frame_to_frame_similarity(q, self.target)
@@ -65,15 +67,15 @@ class ViSiL(object):
                     self.similarities.append(similarity)
             else:
                 print('[INFO] Queries will NOT be loaded to the gpu')
-                self.query = tf.placeholder(tf.float32, [None, None, None], name='query')
-                self.target = tf.placeholder(tf.float32, [None, None, None], name='target')
+                self.query = tf.compat.v1.placeholder(tf.float32, [None, None, None], name='query')
+                self.target = tf.compat.v1.placeholder(tf.float32, [None, None, None], name='target')
                 self.sim_matrix = self.frame_to_frame_similarity(self.query, self.target)
                 self.similarity = self.video_to_video_similarity(self.sim_matrix)
 
         init = self.load_model(model_dir)
-        config = tf.ConfigProto(allow_soft_placement=True)
+        config = tf.compat.v1.ConfigProto(allow_soft_placement=True)
         config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=config)
+        self.sess = tf.compat.v1.Session(config=config)
         self.sess.run(init)
 
     def preprocess_resnet(self, video):
@@ -92,29 +94,29 @@ class ViSiL(object):
     def region_pooling(self, video):
         if self.net == 'resnet':
             from .nets import resnet_v1
-            with tf.contrib.slim.arg_scope(resnet_v1.resnet_arg_scope()):
+            with slim.arg_scope(resnet_v1.resnet_arg_scope()):
                 _, network = resnet_v1.resnet_v1_50(video, num_classes=None, is_training=False)
 
             layers = [['resnet_v1_50/block1', 8], ['resnet_v1_50/block2', 4],
                       ['resnet_v1_50/block3', 2], ['resnet_v1_50/block4', 2]]
 
-            with tf.variable_scope('region_vectors'):
+            with tf.compat.v1.variable_scope('region_vectors'):
                 features = []
                 for l, p in layers:
                     logits = tf.nn.relu(network[l])
-                    logits = tf.layers.max_pooling2d(logits, [np.floor(p+p/2), np.floor(p+p/2)], p, padding='VALID')
+                    logits = tf.compat.v1.layers.max_pooling2d(logits, [np.floor(p+p/2), np.floor(p+p/2)], p, padding='VALID')
                     logits = tf.nn.l2_normalize(logits, -1, epsilon=1e-15)
                     features.append(logits)
                 logits = tf.concat(features, axis=-1)
                 logits = tf.nn.l2_normalize(logits, -1, epsilon=1e-15)
-            logits = tf.reshape(logits, [tf.shape(logits)[0], -1, tf.shape(logits)[-1]])
+            logits = tf.reshape(logits, [tf.shape(input=logits)[0], -1, tf.shape(input=logits)[-1]])
         elif self.net == 'i3d':
             from .nets import i3d
-            with tf.variable_scope('RGB'):
+            with tf.compat.v1.variable_scope('RGB'):
                 model = i3d.InceptionI3d(400, spatial_squeeze=True, final_endpoint='Logits')
                 logits, _ = model(video, is_training=False, dropout_keep_prob=1.0)
 
-            with tf.variable_scope('region_vectors'):
+            with tf.compat.v1.variable_scope('region_vectors'):
                 logits = tf.nn.l2_normalize(tf.nn.relu(logits), -1, epsilon=1e-15)
 
         return tf.expand_dims(logits, axis=1) if len(logits.shape) < 3 else logits
@@ -128,7 +130,7 @@ class ViSiL(object):
         return logits
     
     def frame_to_frame_similarity(self, query, target):
-        tensor_dot = tf.tensordot(query, tf.transpose(target), axes=1)
+        tensor_dot = tf.tensordot(query, tf.transpose(a=target), axes=1)
         sim_matrix = self.f2f_sim(tensor_dot)
         return sim_matrix
 
@@ -140,12 +142,12 @@ class ViSiL(object):
         return sim
 
     def load_model(self, model_path):
-        previous_variables = [var_name for var_name, _ in tf.contrib.framework.list_variables(model_path)]
-        restore_map = {variable.op.name: variable for variable in tf.global_variables()
+        previous_variables = [var_name for var_name, _ in tf.train.list_variables(model_path)]
+        restore_map = {variable.op.name: variable for variable in tf.compat.v1.global_variables()
                        if variable.op.name in previous_variables and 'PCA' not in variable.op.name} #
         print('[INFO] {} layers loaded'.format(len(restore_map)))
-        tf.contrib.framework.init_from_checkpoint(model_path, restore_map)
-        tf_init = tf.global_variables_initializer()
+        tf.compat.v1.train.init_from_checkpoint(model_path, restore_map)
+        tf_init = tf.compat.v1.global_variables_initializer()
         return tf_init
 
     def extract_features(self, frames, batch_sz):
@@ -162,7 +164,7 @@ class ViSiL(object):
 
     def set_queries(self, queries):
         if self.load_queries:
-            self.sess.run([tf.assign(self.queries[i], queries[i], validate_shape=False) for i in range(len(queries))])
+            self.sess.run([tf.compat.v1.assign(self.queries[i], queries[i], validate_shape=False) for i in range(len(queries))])
         else:
             self.queries = queries
 

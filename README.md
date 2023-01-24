@@ -1,4 +1,4 @@
-# ViSiL: Fine-grained Spatio-Temporal Video Similarity Learning
+# ViSiL: Fine-grained Spatio-Temporal Video Similarity Learning (Updated for Tensorflow 2)
 This repository contains the Tensorflow 2 implementation of the paper 
 [ViSiL: Fine-grained Spatio-Temporal Video Similarity Learning](http://openaccess.thecvf.com/content_ICCV_2019/papers/Kordopatis-Zilos_ViSiL_Fine-Grained_Spatio-Temporal_Video_Similarity_Learning_ICCV_2019_paper.pdf). 
 It provides code for the calculation of similarities between the query and database videos given by the user.
